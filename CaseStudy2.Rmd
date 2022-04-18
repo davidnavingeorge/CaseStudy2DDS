@@ -1,0 +1,109 @@
+---
+title: "Case Study 2"
+author: "David George"
+date: '2022-04-13'
+output: html_document
+---
+
+Youtube link:
+https://youtu.be/ux-e_2qyLRI
+
+This case study examined the employee.csv dataset and allowed us to find some prominent trends including the jobs with the average environment satisfaction, the highest average job satisfaction, and the highest number of years at the company. We also built a naive bayes classifier using all variables in our dataset to classify attrition with very high accuracy, sensitivity and specificity. We also predicted yearly salary based on various factors using a linear regression model.
+
+
+```{r setup, include=FALSE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(class)
+library(e1071)
+library(caret)
+library(naniar)
+library(GGally)
+employee<-read.csv("https://raw.githubusercontent.com/davidnavingeorge/MSDS_6306_Doing-Data-Science/Master/Unit%2014%20and%2015%20Case%20Study%202/CaseStudy2-data.csv")
+head(employee)
+```
+
+Highest Environment Satisfaction
+
+When examining the average environment satisfaction by job role, I found that the job with the highest was Manufacturing Director and the lowest was Research Director.
+
+```{r}
+employeeEnviron=employee%>%group_by(JobRole)%>%summarise(AverageEnvironmentSatisfaction=mean(EnvironmentSatisfaction))
+ggplot(aes(x=reorder(JobRole,-AverageEnvironmentSatisfaction),y=AverageEnvironmentSatisfaction),data=employeeEnviron)+geom_bar(stat="identity")+
+  ggtitle("Average Environment Satisfaction for each Occupation") +
+  xlab("Job Role")+ylab("Average Environment Satisfaction")+
+  geom_text(aes(label  = round(AverageEnvironmentSatisfaction,digits=2)), vjust = -0.5, size = 3, color = "black")
+
+```
+
+Highest Job Satisfaction
+
+When examining the average job satisfaction by job role, the job with the highest was Healthcare Representative and the lowest was Research Director.
+
+```{r}
+employeeJobSat=employee%>%group_by(JobRole)%>%summarise(AverageJobSatisfaction=mean(JobSatisfaction))
+ggplot(aes(x=reorder(JobRole,-AverageJobSatisfaction),y=AverageJobSatisfaction),data=employeeJobSat)+geom_bar(stat="identity")+
+  ggtitle("Average Job Satisfaction for each Occupation") +
+  xlab("Job Role")+ylab("Average Job Satisfaction")+
+  geom_text(aes(label  = round(AverageJobSatisfaction,digits=2)), vjust = -0.5, size = 3, color = "black")
+```
+
+Job with Highest Number of Years At Company
+
+When examining the jobs with the highest number of years at the company, the job that had the highest was Manager and the lowest was Sales Representative.
+
+```{r}
+employeeYearsAtComp=employee%>%group_by(JobRole)%>%summarise(AverageYearsAtCompany=mean(YearsAtCompany ))
+ggplot(aes(x=reorder(JobRole,-AverageYearsAtCompany),y=AverageYearsAtCompany),data=employeeYearsAtComp)+geom_bar(stat="identity")+
+  ggtitle("Average Number of Years At Company  per Occupation") +
+  xlab("Job Role")+ylab("Average Number of Years At Company ")+
+  geom_text(aes(label  = round(AverageYearsAtCompany,digits=2)), vjust = -0.5, size = 3, color = "black")
+```
+
+
+Classifying Attrition
+
+A Naive Bayes Classifier with all variables from the dataset in the model was able to classify attrition with 85% accuracy, 88% sensitivity and 71% specificity. Using all variables from the dataset allowed to the model to predict attrition in unseen data (the test set) very well.
+
+
+```{r}
+trainIndices = sample(1:dim(employee)[1],round(0.7 * dim(employee)[1]))
+train = employee[trainIndices,]
+test = employee[-trainIndices,]
+model<-naiveBayes(Attrition ~.,data=train)
+predict(model,test)
+confusionMatrix(table(predict(model,test),test$Attrition))
+
+```
+
+Predicting Salary 
+
+Using linear regression allows us to predict continuous numerical variables like Salary as opposed to Naive Bayes that can only predict discrete categorical variables. The Employee Count, Over18, and StandardHours variables were excluded from the model because each variable had only one possible outcome.  MonthlyIncome was also excluded because it was used to calculate yearly Salary. Stepwise selection was used to filter out remaining insignificant variables from the model.
+
+
+```{r}
+employee$Salary<-employee$MonthlyIncome*12
+employeeDropped<-employee[, colnames(employee) != "EmployeeCount" &colnames(employee) != "Over18"
+                          &colnames(employee) != "StandardHours"&colnames(employee) != "MonthlyIncome"]
+
+
+trainIndices = sample(1:dim(employeeDropped)[1],round(0.7 * dim(employeeDropped)[1]))
+train = employeeDropped[trainIndices,]
+test = employeeDropped[-trainIndices,]
+start <- lm(Salary ~ 1, data=train)
+all <- lm(Salary ~ ., data=train)
+forward <- step(start, direction='both', scope=formula(all), trace=0)
+summary(forward)
+
+
+fit<-lm(formula = Salary ~ JobLevel + JobRole + TotalWorkingYears + 
+     BusinessTravel + DistanceFromHome + YearsWithCurrManager +  YearsSinceLastPromotion, data = train)
+summary(fit)
+sqrt(sum((predict(fit,newdata=test)-test$Salary)^2)/324)
+
+```
+
+
+Overall, this dataset allowed us great freedom in examining important trends like the jobs with the average environment satisfaction, the highest average job satisfaction, and the highest number of years at the company. Our  naive bayes classifier used all variables in our dataset to classify attrition with very accurately, sensitivity and specificity. Our linear regression model also predicted yearly salary based on various factors but with high Root Mean Squared Error on the training set and  high Root Mean Squared Predicted Error on the test set.
+
